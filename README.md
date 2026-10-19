@@ -34,7 +34,7 @@ No installation or build step is required!
 
 1. Clone or download this repository:
    ```bash
-   git clone https://github.com/purvat2008/mini-project.git
+   git clone https://github.com/purvat2008/mini-project
    ```
 2. Open `chase game.html` directly in any web browser.
 
