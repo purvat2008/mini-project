@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Enemy Chase Game - A* Pathfinding Visualizer</title>
+    <!-- Tailwind CSS for modern responsive UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center p-3 md:p-6">
+
+    <!-- Title & Subtitle -->
+    <header class="text-center mb-4">
+        <h1 class="text-2xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">
+             Enemy Chase Game
+        </h1>
+        <p class="text-xs md:text-sm text-slate-400 mt-1">
+            Real-time <span class="text-cyan-400 font-semibold">A* Search Algorithm</span> Pathfinding Simulation
+        </p>
+    </header>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-5xl flex flex-col lg:flex-row gap-6 items-center lg:items-start justify-center">
+
+        <!-- Left / Top Panel: Game Canvas & Mobile Controls -->
+        <div class="flex flex-col items-center w-full lg:w-auto">
+            <!-- Score & Status Bar -->
+            <div class="w-full bg-slate-800/80 backdrop-blur rounded-t-xl p-3 border-b border-slate-700 flex justify-between items-center text-sm font-semibold">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400">Score:</span>
+                    <span id="scoreDisplay" class="text-yellow-400 text-lg font-bold">0</span>
+                </div>
+                <div id="statusBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    PLAYING
+                </div>
+            </div>
+
+            <!-- Game Canvas -->
+            <div class="relative bg-slate-950 p-2 border-x border-b border-slate-700 rounded-b-xl shadow-2xl">
+                <canvas id="gameCanvas" class="rounded border border-slate-800 cursor-pointer block"></canvas>
+                
+                <!-- Game Over Overlay -->
+                <div id="gameOverOverlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm rounded-b-xl flex flex-col items-center justify-center gap-4 p-4 text-center">
+                    <h2 class="text-3xl font-black text-rose-500 tracking-wider">GAME OVER!</h2>
+                    <p class="text-slate-300">The AI caught you using optimal A* pathfinding.</p>
+                    <div class="bg-slate-800/80 px-6 py-3 rounded-lg border border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase tracking-widest block">Final Score</span>
+                        <span id="finalScore" class="text-3xl font-bold text-yellow-400">0</span>
+                    </div>
+                    <button id="overlayRestartBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2.5 rounded-lg shadow-lg transition active:scale-95">
+                        Play Again 🔄
+                    </button>
+                </div>
+            </div>
+
+            <!-- On-Screen Touch D-Pad for Mobile/Mouse -->
+            <div class="mt-4 grid grid-cols-3 gap-2 w-48 sm:w-56 md:hidden">
+                <div></div>
+                <button id="btnUp" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold p-4 rounded-lg text-center shadow border border-slate-700">▲</button>
+                <div></div>
+                <button id="btnLeft" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold p-4 rounded-lg text-center shadow border border-slate-700">◀</button>
+                <button id="btnDown" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold p-4 rounded-lg text-center shadow border border-slate-700">▼</button>
+                <button id="btnRight" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold p-4 rounded-lg text-center shadow border border-slate-700">▶</button>
+            </div>
+        </div>
+
+        <!-- Right / Bottom Panel: Controls, Legend & Settings -->
+        <div class="w-full lg:w-80 flex flex-col gap-4">
+            
+            <!-- Controls Panel -->
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+                <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    ⚙️ Controls & Actions
+                </h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="playPauseBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-lg text-sm transition active:scale-95 flex items-center justify-center gap-1.5 shadow">
+                        <span>⏸️</span> <span id="playPauseText">Pause</span>
+                    </button>
+                    <button id="restartBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-3 rounded-lg text-sm transition active:scale-95 flex items-center justify-center gap-1.5 shadow">
+                        <span>🔄</span> Restart
+                    </button>
+                </div>
+                <button id="clearWallsBtn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2 px-3 rounded-lg text-xs transition border border-slate-600">
+                    🧹 Clear All Walls
+                </button>
+            </div>
+
+            <!-- Settings & Toggles -->
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 shadow-lg flex flex-col gap-4">
+                <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    🛠️ Options & Visualizer
+                </h2>
+
+                <!-- A* Path Visualizer Toggle -->
+                <label class="flex items-center justify-between cursor-pointer group">
+                    <span class="text-xs font-semibold text-slate-300 group-hover:text-cyan-400 transition">
+                        Show A* Path Overlay
+                    </span>
+                    <input type="checkbox" id="pathToggle" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500 relative"></div>
+                </label>
+
+                <!-- Speed / Difficulty Slider -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex justify-between text-xs font-semibold">
+                        <span class="text-slate-300">Enemy Speed:</span>
+                        <span id="speedValue" class="text-cyan-400">Normal (300ms)</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="100" max="600" step="50" value="300" class="w-full accent-cyan-400 bg-slate-700 rounded-lg cursor-pointer h-2">
+                </div>
+
+                <!-- Level Editor Instruction -->
+                <div class="p-2.5 bg-slate-900/60 border border-slate-700/50 rounded-lg text-xs text-slate-400">
+                    💡 <strong class="text-slate-200">Level Editor:</strong> Click or drag on grid cells to add/remove custom wall barriers dynamically!
+                </div>
+            </div>
+
+            <!-- Map Legend & Rules -->
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 shadow-lg flex flex-col gap-2 text-xs">
+                <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">🎯 Map Legend</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-cyan-500 rounded border border-cyan-300"></div>
+                        <span class="text-slate-300">Player (P)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-rose-500 rounded border border-rose-300"></div>
+                        <span class="text-slate-300">AI Enemy (E)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-slate-700 rounded border border-slate-600"></div>
+                        <span class="text-slate-300">Obstacle (#)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-cyan-400/40 border border-cyan-400 rounded"></div>
+                        <span class="text-slate-300">A* Path Dot</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- JavaScript Game Logic -->
+    <script>
+        // --- Game Setup & Constants ---
+        const COLS = 15;
+        const ROWS = 10;
+        const CELL_SIZE = Math.min(window.innerWidth < 640 ? 24 : 36, 40);
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = COLS * CELL_SIZE;
+        canvas.height = ROWS * CELL_SIZE;
+
+        // --- Game State Variables ---
+        let grid = [];
+        let player = { r: 8, c: 13 };
+        let enemy = { r: 1, c: 1 };
+        let currentPath = [];
+        let score = 0;
+        let isPaused = false;
+        let isGameOver = false;
+        let enemyInterval = 300; // ms per step
+        let enemyTimer = null;
+        let isMouseDown = false;
+        let drawMode = 1; // 1 = add wall, 0 = erase wall
+
+        // --- UI Elements ---
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const statusBadge = document.getElementById('statusBadge');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playPauseText = document.getElementById('playPauseText');
+        const restartBtn = document.getElementById('restartBtn');
+        const clearWallsBtn = document.getElementById('clearWallsBtn');
+        const overlayRestartBtn = document.getElementById('overlayRestartBtn');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const finalScore = document.getElementById('finalScore');
+        const pathToggle = document.getElementById('pathToggle');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+
+        // --- Initialize Default Map ---
+        function initGrid() {
+            grid = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+            
+            // Preset maze walls for immediate challenge
+            const presetWalls = [
+                [2, 3], [3, 3], [4, 3], [5, 3],
+                [1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7],
+                [4, 10], [5, 10], [6, 10], [7, 10], [8, 10]
+            ];
+            
+            presetWalls.forEach(([r, c]) => {
+                if (r < ROWS && c < COLS) grid[r][c] = 1;
+            });
+        }
+
+        // --- A* Search Algorithm ---
+        class PriorityQueue {
+            constructor() { this.elements = []; }
+            enqueue(element, priority) {
+                this.elements.push({ element, priority });
+                this.elements.sort((a, b) => a.priority - b.priority);
+            }
+            dequeue() { return this.elements.shift().element; }
+            isEmpty() { return this.elements.length === 0; }
+        }
+
+        function heuristic(r1, c1, r2, c2) {
+            // Manhattan distance heuristic
+            return Math.abs(r1 - r2) + Math.abs(c1 - c2);
+        }
+
+        function computeAStarPath(start, goal) {
+            if (start.r === goal.r && start.c === goal.c) return [];
+
+            const pq = new PriorityQueue();
+            const gScore = Array(ROWS).fill(null).map(() => Array(COLS).fill(Infinity));
+            const cameFrom = Array(ROWS).fill(null).map(() => Array(COLS).fill(null));
+
+            gScore[start.r][start.c] = 0;
+            pq.enqueue({ r: start.r, c: start.c }, 0);
+
+            const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // Up, Down, Left, Right
+
+            while (!pq.isEmpty()) {
+                const curr = pq.dequeue();
+
+                if (curr.r === goal.r && curr.c === goal.c) {
+                    // Reconstruct path
+                    const path = [];
+                    let temp = goal;
+                    while (temp && !(temp.r === start.r && temp.c === start.c)) {
+                        path.push(temp);
+                        temp = cameFrom[temp.r][temp.c];
+                    }
+                    return path.reverse();
+                }
+
+                for (let [dr, dc] of directions) {
+                    const nr = curr.r + dr;
+                    const nc = curr.c + dc;
+
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc] === 0) {
+                        const tentativeG = gScore[curr.r][curr.c] + 1;
+                        if (tentativeG < gScore[nr][nc]) {
+                            gScore[nr][nc] = tentativeG;
+                            cameFrom[nr][nc] = { r: curr.r, c: curr.c };
+                            const fScore = tentativeG + heuristic(nr, nc, goal.r, goal.c);
+                            pq.enqueue({ r: nr, c: nc }, fScore);
+                        }
+                    }
+                }
+            }
+            return []; // Path not found (blocked)
+        }
+
+        // --- Render Loop ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Grid Cells & Walls
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const x = c * CELL_SIZE;
+                    const y = r * CELL_SIZE;
+
+                    if (grid[r][c] === 1) {
+                        // Wall
+                        ctx.fillStyle = '#334155';
+                        ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                        ctx.strokeStyle = '#1e293b';
+                        ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+                    } else {
+                        // Empty Floor
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                        ctx.strokeStyle = '#1e293b';
+                        ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+                    }
+                }
+            }
+
+            // Draw A* Calculated Path Overlay (if enabled)
+            if (pathToggle.checked && currentPath.length > 0) {
+                currentPath.forEach(node => {
+                    const cx = node.c * CELL_SIZE + CELL_SIZE / 2;
+                    const cy = node.r * CELL_SIZE + CELL_SIZE / 2;
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, CELL_SIZE / 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = 'rgba(34, 211, 238, 0.6)';
+                    ctx.fill();
+                });
+            }
+
+            // Draw Player (Blue)
+            const px = player.c * CELL_SIZE + CELL_SIZE * 0.1;
+            const py = player.r * CELL_SIZE + CELL_SIZE * 0.1;
+            const pSize = CELL_SIZE * 0.8;
+            ctx.fillStyle = '#06b6d4';
+            ctx.shadowColor = '#06b6d4';
+            ctx.shadowBlur = 10;
+            ctx.fillRect(px, py, pSize, pSize);
+            ctx.shadowBlur = 0; // Reset blur
+
+            // Draw AI Enemy (Red)
+            const ex = enemy.c * CELL_SIZE + CELL_SIZE * 0.1;
+            const ey = enemy.r * CELL_SIZE + CELL_SIZE * 0.1;
+            const eSize = CELL_SIZE * 0.8;
+            ctx.fillStyle = '#f43f5e';
+            ctx.shadowColor = '#f43f5e';
+            ctx.shadowBlur = 12;
+            ctx.fillRect(ex, ey, eSize, eSize);
+            ctx.shadowBlur = 0; // Reset blur
+        }
+
+        // --- Game Logic Updates ---
+        function updateEnemy() {
+            if (isPaused || isGameOver) return;
+
+            // Compute fresh A* path
+            currentPath = computeAStarPath(enemy, player);
+
+            if (currentPath.length > 0) {
+                // Move enemy 1 step along the calculated path
+                const nextStep = currentPath.shift();
+                enemy.r = nextStep.r;
+                enemy.c = nextStep.c;
+            }
+
+            // Check Collision / Catch
+            if (enemy.r === player.r && enemy.c === player.c) {
+                triggerGameOver();
+            }
+
+            draw();
+        }
+
+        function movePlayer(dr, dc) {
+            if (isPaused || isGameOver) return;
+
+            const nr = player.r + dr;
+            const nc = player.c + dc;
+
+            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc] === 0) {
+                player.r = nr;
+                player.c = nc;
+                score += 10;
+                scoreDisplay.innerText = score;
+
+                // Instantly update path preview when player moves
+                currentPath = computeAStarPath(enemy, player);
+
+                if (enemy.r === player.r && enemy.c === player.c) {
+                    triggerGameOver();
+                }
+                draw();
+            }
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            clearInterval(enemyTimer);
+            finalScore.innerText = score;
+            gameOverOverlay.classList.remove('hidden');
+            statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30";
+            statusBadge.innerText = "GAME OVER";
+        }
+
+        function startEnemyLoop() {
+            clearInterval(enemyTimer);
+            enemyTimer = setInterval(updateEnemy, enemyInterval);
+        }
+
+        function resetGame() {
+            initGrid();
+            player = { r: 8, c: 13 };
+            enemy = { r: 1, c: 1 };
+            score = 0;
+            scoreDisplay.innerText = score;
+            isPaused = false;
+            isGameOver = false;
+
+            gameOverOverlay.classList.add('hidden');
+            playPauseText.innerText = "Pause";
+            playPauseBtn.querySelector('span').innerText = "⏸️";
+
+            statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            statusBadge.innerText = "PLAYING";
+
+            currentPath = computeAStarPath(enemy, player);
+            draw();
+            startEnemyLoop();
+        }
+
+        // --- Event Listeners ---
+
+        // Keyboard Movement
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'KeyW'].includes(e.code)) { movePlayer(-1, 0); e.preventDefault(); }
+            else if (['ArrowDown', 'KeyS'].includes(e.code)) { movePlayer(1, 0); e.preventDefault(); }
+            else if (['ArrowLeft', 'KeyA'].includes(e.code)) { movePlayer(0, -1); e.preventDefault(); }
+            else if (['ArrowRight', 'KeyD'].includes(e.code)) { movePlayer(0, 1); e.preventDefault(); }
+        });
+
+        // On-Screen D-Pad Buttons
+        document.getElementById('btnUp').addEventListener('click', () => movePlayer(-1, 0));
+        document.getElementById('btnDown').addEventListener('click', () => movePlayer(1, 0));
+        document.getElementById('btnLeft').addEventListener('click', () => movePlayer(0, -1));
+        document.getElementById('btnRight').addEventListener('click', () => movePlayer(0, 1));
+
+        // Interactive Level Editor (Click/Drag Walls)
+        function handleGridPointer(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+            if (!clientX || !clientY) return;
+
+            const c = Math.floor((clientX - rect.left) / CELL_SIZE);
+            const r = Math.floor((clientY - rect.top) / CELL_SIZE);
+
+            if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                // Prevent wall placement on player or enemy
+                if ((r === player.r && c === player.c) || (r === enemy.r && c === enemy.c)) return;
+
+                if (e.type === 'pointerdown') {
+                    drawMode = grid[r][c] === 1 ? 0 : 1;
+                }
+                grid[r][c] = drawMode;
+                currentPath = computeAStarPath(enemy, player);
+                draw();
+            }
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            isMouseDown = true;
+            handleGridPointer(e);
+        });
+        canvas.addEventListener('pointermove', (e) => {
+            if (isMouseDown) handleGridPointer(e);
+        });
+        window.addEventListener('pointerup', () => { isMouseDown = false; });
+
+        // Controls Buttons
+        playPauseBtn.addEventListener('click', () => {
+            if (isGameOver) return;
+            isPaused = !isPaused;
+            if (isPaused) {
+                clearInterval(enemyTimer);
+                playPauseText.innerText = "Resume";
+                playPauseBtn.querySelector('span').innerText = "▶️";
+                statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                statusBadge.innerText = "PAUSED";
+            } else {
+                startEnemyLoop();
+                playPauseText.innerText = "Pause";
+                playPauseBtn.querySelector('span').innerText = "⏸️";
+                statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                statusBadge.innerText = "PLAYING";
+            }
+        });
+
+        restartBtn.addEventListener('click', resetGame);
+        overlayRestartBtn.addEventListener('click', resetGame);
+
+        clearWallsBtn.addEventListener('click', () => {
+            grid = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+            currentPath = computeAStarPath(enemy, player);
+            draw();
+        });
+
+        pathToggle.addEventListener('change', draw);
+
+        speedSlider.addEventListener('input', (e) => {
+            enemyInterval = parseInt(e.target.value);
+            const label = enemyInterval <= 150 ? "Fast ⚡" : enemyInterval <= 350 ? "Normal" : "Slow 🐢";
+            speedValue.innerText = `${label} (${enemyInterval}ms)`;
+            if (!isPaused && !isGameOver) {
+                startEnemyLoop();
+            }
+        });
+
+        // Initialize Game
+        resetGame();
+    </script>
+</body>
+</html>
